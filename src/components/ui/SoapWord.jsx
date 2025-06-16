@@ -1,6 +1,7 @@
 // 移除了未使用的 framer-motion 导入
 import React, { useEffect, useRef } from 'react';
-import './style/globals.css'
+// 修正導入樣式路徑錯誤，指向 src/styles 目錄
+import '../../styles/globals.css'
 
 export default function Soapword({ textString }) {
     const textRef = useRef(null);
@@ -12,10 +13,11 @@ export default function Soapword({ textString }) {
         currentY: 0,
         targetY: 0,
         currentRotation: 0,
-        tartgetRotation: 0,
+        targetRotation: 0,
     });
 
-    text=textString.split('');
+    // 將傳入的字串拆分為單個字元陣列
+    const text = textString.split('');
     
     useEffect(() => {
         const textElement = textRef.current;
