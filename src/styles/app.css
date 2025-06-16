@@ -1,0 +1,15 @@
+.big-line{
+    font-size: 10vh;
+}
+
+.small-paragraph{
+    font-size : 2vh;
+}
+
+#app-container{
+    display:flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
