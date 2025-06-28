@@ -1,33 +1,31 @@
-// 移除了未使用的 framer-motion 导入
 import React, { useEffect, useRef } from 'react';
-// 修正導入樣式路徑錯誤，指向 src/styles 目錄
-import '../../styles/globals.css'
+import '../../styles/globals.css'; // 假设样式路径已修正
 
-export default function Soapword({ textString }) {
+export default function Soapword({ text }) {
     const textRef = useRef(null);
-    const animationFrameId = useRef(null); // 用于存储 requestAnimationFrame 的 ID
+    const animationFrameId = useRef(null);
+    const lastMouseAngle = useRef(null);
 
+    // 新增速度属性
     const animationState = useRef({
         currentX: 0,
         targetX: 0,
+        velocityX: 0,
         currentY: 0,
         targetY: 0,
+        velocityY: 0,
         currentRotation: 0,
         targetRotation: 0,
+        velocityRotation: 0,
     });
 
-    // 將傳入的字串拆分為單個字元陣列
-    const text = textString.split('');
-    
     useEffect(() => {
         const textElement = textRef.current;
         if (!textElement) return;
 
-        // 变量名 'effectRadiusRef' 有点误导性，因为它不是一个 ref。
-        // 改为 'effectRadius' 更清晰。
         const fontSize = parseFloat(window.getComputedStyle(textElement).fontSize);
         const effectRadius = 2 * fontSize / Math.sqrt(2) + 20;
-        //console.log(effectRadius);
+
         const handleMouseMove = (event) => {
             const mouseX = event.clientX;
             const mouseY = event.clientY;
@@ -38,64 +36,87 @@ export default function Soapword({ textString }) {
 
             const dX = mouseX - positionX;
             const dY = mouseY - positionY;
-
             const dist = Math.sqrt(dX * dX + dY * dY);
 
             let moveX = 0;
             let moveY = 0;
+            let moveRotation = 0;
 
             if (dist <= effectRadius) {
                 const angle = Math.atan2(dY, dX);
-                const force = effectRadius - dist;
+                const force = (effectRadius - dist) * 0.5;
 
-                // FIX 4: 增加了负号，实现“推开”效果
                 moveX = -force * Math.cos(angle);
                 moveY = -force * Math.sin(angle);
+
+                if (lastMouseAngle.current != null) {
+                    let rawDiff = angle - lastMouseAngle.current;
+                    if (rawDiff > Math.PI) rawDiff -= 2 * Math.PI;
+                    if (rawDiff < -Math.PI) rawDiff += 2 * Math.PI;
+                    moveRotation = rawDiff * (180 / Math.PI) / 10;
+                }
+
+                animationState.current.targetRotation += moveRotation;
+                lastMouseAngle.current = angle;
+            } else {
+                animationState.current.targetRotation = 0;
+                lastMouseAngle.current = null;
             }
 
             animationState.current.targetX = moveX;
             animationState.current.targetY = moveY;
         };
 
-        // 将事件监听器绑定到 handleMouseMove 函数
         window.addEventListener('mousemove', handleMouseMove);
 
+        // 你可以在这里调整弹簧参数
+        const stiffness = 0.18; // 弹性刚度，越大弹跳越强
+        const damping = 0.65;   // 阻尼，越小弹跳越明显（但不能为0，建议0.5~0.8）
+
         const animate = () => {
-            const push = 0.25;
-            
-            // FIX 2: 正确地从 ref 的 .current 属性获取状态
             const state = animationState.current;
 
-            state.currentX += (state.targetX - state.currentX) * push;
-            state.currentY += (state.targetY - state.currentY) * push;
+            // X轴弹簧动画
+            let forceX = (state.targetX - state.currentX) * stiffness;
+            state.velocityX = (state.velocityX + forceX) * damping;
+            state.currentX += state.velocityX;
 
-            textElement.style.transform = `translate(${state.currentX}px, ${state.currentY}px)`;
+            // Y轴弹簧动画
+            let forceY = (state.targetY - state.currentY) * stiffness;
+            state.velocityY = (state.velocityY + forceY) * damping;
+            state.currentY += state.velocityY;
 
-            // 将 requestAnimationFrame 的 ID 存入 ref
+            // 旋转弹簧动画
+            let forceRotation = (state.targetRotation - state.currentRotation) * stiffness;
+            state.velocityRotation = (state.velocityRotation + forceRotation) * damping;
+            state.currentRotation += state.velocityRotation;
+
+            textElement.style.transform = `translate(${state.currentX}px, ${state.currentY}px) rotate(${state.currentRotation}deg)`;
+
             animationFrameId.current = requestAnimationFrame(animate);
         };
-        
-        // FIX 1: 启动动画循环！
+
         animate();
 
-        // FIX 3: 添加清理函数！
         return () => {
-            // 组件卸载时，移除事件监听器
             window.removeEventListener('mousemove', handleMouseMove);
-            
-            // 组件卸载时，取消动画循环
             if (animationFrameId.current) {
                 cancelAnimationFrame(animationFrameId.current);
             }
         };
-    }, []); // 空依赖数组确保这个 effect 只运行一次
+    }, []);
 
     return (
         <span
             ref={textRef}
-            style={{ display: 'inline-block', // inline-block 是必须的
-                     willChange: 'transform', // 小优化：告诉浏览器这个元素的 transform 会变
-                     cursor: 'default'
+            style={{
+                display: 'inline-block',
+                willChange: 'transform',
+                cursor: 'default',
+                userSelect: 'none',      // <--- 禁止文本选中
+                WebkitUserSelect: 'none',// <--- 兼容 Safari/旧版 Chrome
+                MozUserSelect: 'none',   // <--- 兼容 Firefox
+                msUserSelect: 'none',    // <--- 兼容 IE/Edge
             }}
         >
             {text === ' ' ? '\u00A0' : text}
